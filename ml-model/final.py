@@ -116,3 +116,28 @@ accuracy = evaluator.evaluate(processed_data)
 total_rows = processed_data.count()
 print(f"Total number of rows: {total_rows}")
 print(f"Accuracy of the model: {accuracy:.2f}")
+
+def clean_new_text(df, inputCol="Text", outputCol="cleaned_text"):
+    """Clean the new text data."""
+    df = df.withColumn(outputCol, regexp_replace(df[inputCol], r'https?://\S+|www\.\S+|\.com\S+|youtu\.be/\S+', ''))
+    df = df.withColumn(outputCol, regexp_replace(df[outputCol], r'(@|#)\w+', ''))
+    df = df.withColumn(outputCol, lower(df[outputCol]))  # Convert text to lowercase
+    df = df.withColumn(outputCol, regexp_replace(df[outputCol], r'[^a-zA-Z\s]', ''))  # Remove non-alpha characters
+    return df
+
+new_texts = [("Company1", "This is a great product!"), 
+              ("Company2", "I didn't like the service."), 
+              ("Company3", "Neutral comment about the product."),
+              ("Company4", "Not relevant comment that doesn't matter.")]
+
+# Create a DataFrame for new texts
+new_text_df = spark.createDataFrame(new_texts, ["Company", "Text"])
+
+# Clean the new text data
+cleaned_new_text = clean_new_text(new_text_df, inputCol="Text", outputCol="Text")
+
+# Use the trained model to make predictions on the cleaned new text
+predictions = model.transform(cleaned_new_text)
+
+# Show the predictions
+predictions.select("Text", "prediction").show(truncate=False)

@@ -13,8 +13,8 @@ nltk.download('stopwords', quiet=True)
 # Create or retrieve the existing SparkSession
 spark = SparkSession.builder \
     .appName("SentimentAnalysisApp") \
-    .config("spark.executor.memory", "4g") \
-    .config("spark.driver.memory", "4g") \
+    .config("spark.executor.memory", "8g") \
+    .config("spark.driver.memory", "8g") \
     .getOrCreate()
 
 # Load the data and handle any missing values
@@ -101,5 +101,58 @@ predictions_pandas = predictions.select("Tweet-Comment", "Sentiment", "Predicted
 records = predictions_pandas.to_dict(orient='records')
 collection.insert_many(records)
 
+
+
+# Helper function to clean text as a regular Python string (no Spark dependencies)
+def clean_text(text):
+    text = re.sub(r'https?://\S+|www\.\S+|\.com\S+|youtu\.be/\S+', '', text)  # Remove URLs
+    text = re.sub(r'(@|#)\w+', '', text)  # Remove mentions and hashtags
+    text = re.sub(r'[^a-zA-Z\s]', '', text)  # Keep only letters and whitespace
+    text = re.sub(r'\s+', ' ', text)  # Replace multiple spaces with a single space
+    text = text.strip()  # Trim leading and trailing spaces
+    return text
+class_index_mapping = {0: "Negative", 1: "Positive", 2: "Neutral", 3: "Irrelevant"}
+
+
+# Define the classify_text function
+def classify_text(text: str):
+    # Clean the text using the helper function
+    preprocessed_text = text
+
+    # Create a DataFrame from the cleaned text
+    data = [(preprocessed_text,)]
+    data = spark.createDataFrame(data, ["Tweet-Comment"])
+
+    # Apply transformations
+    data = tokenizer.transform(data)
+    data = hashingTF.transform(data)
+    data = idfModel.transform(data)
+
+    # Make the prediction
+    prediction = lrModel.transform(data).select("prediction").collect()[0]["prediction"]
+
+    # Map the prediction to a sentiment label
+    predicted_sentiment = class_index_mapping[int(prediction)]
+
+    # Print the details
+    print("-> Tweet:", text)
+    print("-> Preprocessed Tweet:", preprocessed_text)
+    print("-> Predicted Sentiment:", predicted_sentiment)
+    print("/" * 50)
+
+    # Prepare and insert the document into MongoDB
+    tweet_doc = {
+        "tweet": text,
+        "prediction": predicted_sentiment
+    }
+    collection.insert_one(tweet_doc)
+
+    return predicted_sentiment
+
+# Test the classify_text function
+classify_text("I'm really happy with the new update!")
+print("/" * 50)
+
 # Stop Spark session
 spark.stop()
+
