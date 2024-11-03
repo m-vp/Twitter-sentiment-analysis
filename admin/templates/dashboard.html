@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+</head>
+<body>
+    <h1>Twitter Sentiment Analysis Dashboard</h1>
+    <div class="visualizations">
+        <h2>Sentiment Frequency</h2>
+        <img src="{{ sentiment_plot }}" alt="Sentiment Frequency" class="plot">
+
+        <h2>Dendrogram</h2>
+        <img src="{{ dendrogram_plot }}" alt="Dendrogram" class="plot">
+
+        <h2>Word Cloud</h2>
+        <img src="{{ wordcloud_plot }}" alt="Word Cloud" class="plot">
+
+        <h2>Named Entities Recognized</h2>
+        <ul>
+            {% for entity in entities %}
+                <li>{{ entity.0 }} ({{ entity.1 }})</li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>

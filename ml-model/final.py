@@ -117,6 +117,32 @@ total_rows = processed_data.count()
 print(f"Total number of rows: {total_rows}")
 print(f"Accuracy of the model: {accuracy:.2f}")
 
+# def clean_new_text(df, inputCol="Text", outputCol="cleaned_text"):
+#     """Clean the new text data."""
+#     df = df.withColumn(outputCol, regexp_replace(df[inputCol], r'https?://\S+|www\.\S+|\.com\S+|youtu\.be/\S+', ''))
+#     df = df.withColumn(outputCol, regexp_replace(df[outputCol], r'(@|#)\w+', ''))
+#     df = df.withColumn(outputCol, lower(df[outputCol]))  # Convert text to lowercase
+#     df = df.withColumn(outputCol, regexp_replace(df[outputCol], r'[^a-zA-Z\s]', ''))  # Remove non-alpha characters
+#     return df
+
+# new_texts = [("Company1", "This is a great product!"), 
+#               ("Company2", "I didn't like the service."), 
+#               ("Company3", "Neutral comment about the product."),
+#               ("Company4", "Not relevant comment that doesn't matter.")]
+
+# # Create a DataFrame for new texts
+# new_text_df = spark.createDataFrame(new_texts, ["Company", "Text"])
+
+# # Clean the new text data
+# cleaned_new_text = clean_new_text(new_text_df, inputCol="Text", outputCol="Text")
+
+# # Use the trained model to make predictions on the cleaned new text
+# predictions = model.transform(cleaned_new_text)
+
+# # Show the predictions
+# predictions.select("Text", "prediction").show(truncate=False)
+
+
 def clean_new_text(df, inputCol="Text", outputCol="cleaned_text"):
     """Clean the new text data."""
     df = df.withColumn(outputCol, regexp_replace(df[inputCol], r'https?://\S+|www\.\S+|\.com\S+|youtu\.be/\S+', ''))
@@ -125,19 +151,32 @@ def clean_new_text(df, inputCol="Text", outputCol="cleaned_text"):
     df = df.withColumn(outputCol, regexp_replace(df[outputCol], r'[^a-zA-Z\s]', ''))  # Remove non-alpha characters
     return df
 
-new_texts = [("Company1", "This is a great product!"), 
-              ("Company2", "I didn't like the service."), 
-              ("Company3", "Neutral comment about the product."),
-              ("Company4", "Not relevant comment that doesn't matter.")]
+def classify_text(text):
+    """Classify the sentiment of a given text input."""
+    # Create a DataFrame for the new text
+    new_text_df = spark.createDataFrame([('company1', text)], ["Company", "Text"])  # Use None for 'Company' as it's not used in prediction
 
-# Create a DataFrame for new texts
-new_text_df = spark.createDataFrame(new_texts, ["Company", "Text"])
+    # Clean the new text data
+    cleaned_new_text = clean_new_text(new_text_df, inputCol="Text", outputCol="Text")
 
-# Clean the new text data
-cleaned_new_text = clean_new_text(new_text_df, inputCol="Text", outputCol="Text")
+    # Use the trained model to make predictions on the cleaned new text
+    predictions = model.transform(cleaned_new_text)
 
-# Use the trained model to make predictions on the cleaned new text
-predictions = model.transform(cleaned_new_text)
+    # Select the relevant output (original text and prediction)
+    result = predictions.select("Text", "prediction").collect()
 
-# Show the predictions
-predictions.select("Text", "prediction").show(truncate=False)
+    # Return the result
+    return result
+
+# Call the classify_text function with sample inputs
+sample_texts = [
+    "This is a great product!",
+    "I didn't like the service.",
+    "Neutral comment about the product.",
+    "Not relevant comment that doesn't matter."
+]
+
+# Iterate through the sample texts and classify each
+for text in sample_texts:
+    prediction = classify_text(text)
+    print(f"Text: '{text}' | Prediction: {prediction[0]['prediction']}")
