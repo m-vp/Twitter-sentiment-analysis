@@ -1,3 +1,5 @@
+import base64
+from io import BytesIO
 from django.shortcuts import render
 
 from pymongo import MongoClient
@@ -99,56 +101,90 @@ mongo_client = MongoClient('mongodb://localhost:27017/')  # Update with your Mon
 db = mongo_client['twitter_sentiment']  # Database name
 collection = db['predictions']  # Collection name
 
+def generate_image(fig):
+    buf = BytesIO()
+    fig.savefig(buf, format='png')
+    buf.seek(0)
+    image_png = buf.getvalue()
+    buf.close()
+    return base64.b64encode(image_png).decode('utf-8')
+
 def dashboard(request):
-    # Fetch data from MongoDB
-    data = collection.find()
-    df = pd.DataFrame(list(data))
-    
-    # Handle missing data
-    df.dropna(inplace=True)  # Drop rows with missing values
+    # Fetch data from MongoDB and load into DataFrame
+    data = list(collection.find())
+    df = pd.DataFrame(data)
 
-    # Sentiment analysis using spaCy
-    nlp = spacy.load('en_core_web_sm')
-    text_data = ' '.join(df['Tweet-Comment'])  # Use the actual text column
-    doc = nlp(text_data)
+    # Strip whitespace from column names
+    df.columns = df.columns.str.strip()
+
+    # Convert sentiments to numeric
+    df['Sentiment_Numeric'] = df['Sentiment'].map({'Positive': 1, 'Negative': -1, 'Neutral': 0})
+    df['Predicted_Sentiment_Numeric'] = df['Predicted_Sentiment'].map({'Positive': 1, 'Negative': 0, 'Neutral': 2, 'Irrelevant': 3})
+
+    # Check for NaN values in numeric columns
+    if df['Sentiment_Numeric'].isnull().any() or df['Predicted_Sentiment_Numeric'].isnull().any():
+        print("NaN values found in Sentiment_Numeric or Predicted_Sentiment_Numeric")
+        
+        # Handle NaN values by filling them with a default value, e.g., 0
+        df['Sentiment_Numeric'] = df['Sentiment_Numeric'].fillna(0)
+        df['Predicted_Sentiment_Numeric'] = df['Predicted_Sentiment_Numeric'].fillna(0)
+
+    # Check again for non-finite values
+    if not np.isfinite(df[['Sentiment_Numeric', 'Predicted_Sentiment_Numeric']]).all().all():
+        print("Non-finite values found in the numeric columns.")
+        context = {
+            'dendrogram_img': None,
+            'wordcloud_img': None,
+            'word_freq_img': None,
+            'ner_img': None,
+        }
+        return render(request, 'dashboard.html', context)
+    # Generate a list of full comments
+    comments = df['Tweet-Comment'].tolist()
     
-    # Named Entity Recognition (NER)
-    entities = [(ent.text, ent.label_) for ent in doc.ents]
+    # Create a list of representative words (e.g., the first word of each comment)
+    representative_words = [comment.split()[0] if comment else '' for comment in comments]
     
-    # Word cloud visualization
+    # 1. Dendrogram
+    fig, ax = plt.subplots()
+    linked = linkage(df[['Sentiment_Numeric', 'Predicted_Sentiment_Numeric']], method='ward')
+    dendrogram(linked, ax=ax, labels=representative_words, leaf_rotation=90, leaf_font_size=10)
+    dendrogram_img = generate_image(fig)
+
+    # 2. Word Cloud
+    text_data = ' '.join(df['Tweet-Comment'].fillna(''))
     wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text_data)
+    fig, ax = plt.subplots()
+    ax.imshow(wordcloud, interpolation='bilinear')
+    ax.axis('off')
+    wordcloud_img = generate_image(fig)
 
-    # Plot sentiment frequencies
+    # 3. Plot Word Frequencies per Class
+    fig, ax = plt.subplots()
     sentiment_counts = df['Sentiment'].value_counts()
-    plt.figure(figsize=(10, 5))
-    sns.barplot(x=sentiment_counts.index, y=sentiment_counts.values)
-    plt.title('Sentiment Frequency')
-    plt.xlabel('Sentiment')
-    plt.ylabel('Count')
-    plt.savefig('sentiment_frequency.png')
-    plt.close()
+    sns.barplot(x=sentiment_counts.index, y=sentiment_counts.values, ax=ax)
+    ax.set_title("Word Frequencies per Sentiment Class")
+    word_freq_img = generate_image(fig)
 
-    # Dendrogram
-    # For clustering, you may need to convert sentiments to numeric values
-    sentiment_mapping = {'Positive': 1, 'Negative': -1, 'Neutral': 0}
-    df['Sentiment_Numeric'] = df['Sentiment'].map(sentiment_mapping)
-    linked = linkage(df[['Sentiment_Numeric']], method='ward')
+    # 4. Named Entity Recognition (NER) visualization
+    nlp = spacy.load("en_core_web_sm")
+    entities = []
+    for tweet in df['Tweet-Comment'].fillna(''):
+        doc = nlp(tweet)
+        entities.extend([(ent.text, ent.label_) for ent in doc.ents])
 
-    plt.figure(figsize=(10, 5))
-    dendrogram(linked)
-    plt.title('Dendrogram of Sentiments')
-    plt.savefig('dendrogram.png')
-    plt.close()
+    entity_counter = Counter([label for _, label in entities])
+    fig, ax = plt.subplots()
+    sns.barplot(x=list(entity_counter.keys()), y=list(entity_counter.values()), ax=ax)
+    ax.set_title("Named Entity Recognition (NER)")
+    ner_img = generate_image(fig)
 
-    # Generate the WordCloud image
-    wordcloud_image_path = 'wordcloud.png'
-    wordcloud.to_file(wordcloud_image_path)
-
+    # Add all images to context
     context = {
-        'sentiment_plot': 'sentiment_frequency.png',
-        'dendrogram_plot': 'dendrogram.png',
-        'wordcloud_plot': wordcloud_image_path,
-        'entities': entities
+        'dendrogram_img': dendrogram_img,
+        'wordcloud_img': wordcloud_img,
+        'word_freq_img': word_freq_img,
+        'ner_img': ner_img,
     }
-    
+
     return render(request, 'dashboard.html', context)
