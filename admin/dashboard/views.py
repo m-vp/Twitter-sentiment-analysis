@@ -55,8 +55,15 @@ def classify(request) :
       print(len(text.strip()))
       if len(text.strip()) > 0 :
          error = False
-         from .ml import classify_text
-         prediction = classify_text(text)
+         from .ml import classify_text_lr, classify_text_nb
+         prediction = None
+         print(request.POST.get("drop"))
+               
+         if request.POST.get("drop") == "linear_regression":
+             prediction = classify_text_lr(text)
+         elif request.POST.get('drop') == 'naive_bayes':
+             print('hi')
+             prediction = classify_text_nb(text)
       
       else : 
          error = True
@@ -71,7 +78,7 @@ def classify(request) :
    }
 
    print(context)
-   return render(request, 'classify.html', context)
+   return render(request, 'classify2.html', context)
 
 
 

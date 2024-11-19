@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %} Big Data Project {% endblock title %}</title>
+
+    <!-- Link to Font and FontAwesome for icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    <style>
+        /* Basic Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Background setup */
+        body, html {
+            height: 100%;
+            font-family: 'Poppins', sans-serif;
+            background: #0d1b2a;
+            color: #ffffff;
+        }
+
+        /* Header styling */
+        header {
+            background-color: #14253d;
+            padding: 15px 0;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: #80ed99;
+        }
+
+        h2 {
+            font-size: 2rem;
+            color: #80ed99;
+            margin: 20px 0; /* Space above and below */
+            text-align: center; /* Center text */
+        }
+
+        /* Navigation styling */
+        .nav ul {
+            list-style: none;
+            display: flex;
+        }
+
+        .nav ul li {
+            margin-left: 20px;
+        }
+
+        .nav ul li a {
+            color: #80ed99;
+            text-decoration: none;
+            font-size: 1.1rem;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav ul li a:hover {
+            color: #57cc99;
+        }
+
+        /* Main section styling */
+        main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 0;
+        }
+
+        /* Dropdown styling */
+        .dropdown {
+            margin: 20px auto 30px;
+            display: flex;
+            justify-content: center;
+        }
+
+        select {
+            width: 200px;
+            padding: 10px;
+            font-size: 1rem;
+            font-family: 'Poppins', sans-serif;
+            border-radius: 10px;
+            border: 2px solid #80ed99;
+            background-color: #14253d;
+            color: #ffffff;
+            cursor: pointer;
+            transition: border-color 0.3s ease, background-color 0.3s ease;
+        }
+
+        select:hover {
+            border-color: #57cc99;
+            background-color: #0d1b2a;
+        }
+
+        select option {
+            background-color: #14253d;
+            color: #ffffff;
+        }
+
+        /* Form styling */
+        .classify {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 50%; /* Adjusted width */
+            max-width: 600px;
+            margin-top: 20px; /* Space between title and form */
+            margin-left: 80px;
+        }
+
+        .classify textarea {
+            width: 400%;
+            height: 200px; /* Set a specific height */
+            padding: 15px;
+            margin: 10px 0 10px 30px; /* Margin-bottom of 20px */
+            font-size: 1rem;
+            border-radius: 10px;
+            border: 2px solid #80ed99;
+            background-color: #14253d;
+            color: #ffffff;
+            resize: vertical; /* Allow vertical resizing */
+        }
+
+        .classify textarea::placeholder {
+            color: #a9a9a9;
+        }
+
+        .classify button {
+            background-color: #80ed99;
+            color: #0d1b2a;
+            padding: 12px 30px;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-top: 10px; /* Additional space above button */
+        }
+
+        .classify button:hover {
+            background-color: #57cc99;
+        }
+
+        /* Prediction and Error Message Styling */
+        h3 {
+            color: #ff4d4d; /* Red color for errors */
+            font-weight: 600;
+            margin-top: 15px; /* Add space above error messages */
+        }
+
+        ul {
+            list-style: none;
+            margin-top: 15px;
+        }
+
+        ul li {
+            margin: 8px 0;
+            font-size: 1.1rem;
+        }
+
+        ul li mark {
+            background: none;
+            color: #80ed99;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <div>
+    <header>
+        <div class="container">
+            <div><h1>Classify</h1></div>
+            <nav class="nav">
+                <ul>
+                    <li><a href="{% url 'home' %}"><i class="fa-solid fa-user-pen"></i> Home</a></li>
+                    <li><a href="{% url 'classify' %}"><i class="fa-solid fa-user-pen"></i> Reset</a></li>
+                    <li><a href="{% url 'dashboard' %}"><i class="fa-solid fa-user-pen"></i> Dashboard</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    
+    <main>
+        <div class="container flex-ctr-clm" style="justify-content: center;">
+            <h2>Text Classify using PySpark Model</h2>
+        </div>
+        
+        <div style="justify-content: center;">
+            
+            <form method="post" enctype="multipart/form-data" class="classify">
+                {% csrf_token %}
+                <div class="dropdown">
+                    <select id="algorithm" name = "drop">
+                        <option value="linear_regression">Linear Regression</option>
+                        <option value="naive_bayes">Naive Bayes</option>
+                    </select>
+                </div>
+                <textarea placeholder="Enter your text" name="text" rows="8"></textarea>
+                <button type="submit" style="margin-bottom: 30px;">Classify</button>
+            </form>
+            
+            <!-- Prediction and Error Messages -->
+        </div>
+        <div>
+            {% if text_len > 0 or error %}
+                {% if error %}
+                    <h3>{{ error_text }}</h3>
+                {% else %}
+                    <ul>
+                        <li>Text : {{ text }}</li>
+                        <li>Prediction : <mark>{{ prediction }}</mark></li>
+                    </ul>
+                {% endif %}
+            {% endif %}
+        </div>
+    </main>
+</body>
+</html>

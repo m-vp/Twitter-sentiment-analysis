@@ -147,7 +147,7 @@ def clean_new_text(df, inputCol="Text", outputCol="cleaned_text"):
     df = df.withColumn(outputCol, regexp_replace(df[outputCol], r'[^a-zA-Z\s]', ''))  # Remove non-alpha characters
     return df
 
-def classify_text(text: str):
+def classify_text_lr(text: str):
     stop_words = stopwords.words('english')
 
     # Create a SparkSession
@@ -260,3 +260,84 @@ def classify_text(text: str):
 # for text in sample_texts:
 #     prediction = classify_text(text)
 #     print(f"Text: '{text}' | Prediction: {prediction[0]['prediction']}")
+
+
+
+from pyspark.ml.classification import NaiveBayes
+
+
+
+
+
+
+from pyspark.sql import SparkSession
+from pyspark.ml.feature import StringIndexer, Tokenizer, StopWordsRemover, CountVectorizer
+from pyspark.ml.classification import NaiveBayes
+from pyspark.ml import Pipeline
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+from nltk.corpus import stopwords
+import nltk
+
+nltk.download('stopwords')
+
+def classify_text_nb(text: str):
+    stop_words = stopwords.words('english')
+
+    # Create a SparkSession
+    spark = SparkSession.builder \
+        .appName("Text Classification with PySpark") \
+        .getOrCreate()
+
+    # Load training and validation datasets
+    data = spark.read.csv('twitter_training.csv', header=False, inferSchema=True)
+    validation = spark.read.csv('twitter_validation.csv', header=False, inferSchema=True)
+
+    # Define column names
+    columns = ['id', 'Company', 'Label', 'Text']
+
+    # Rename columns
+    for i, col_name in enumerate(columns):
+        data = data.withColumnRenamed(f'_c{i}', col_name)
+        validation = validation.withColumnRenamed(f'_c{i}', col_name)
+
+    # StringIndexer for the label column
+    label_indexer = StringIndexer(inputCol="Label", outputCol="Label2")
+    label_indexer_model = label_indexer.fit(data)
+    data = label_indexer_model.transform(data)
+    validation = label_indexer_model.transform(validation)
+
+    # Label mappings
+    label_mappings = {i: label for i, label in enumerate(label_indexer_model.labels)}
+
+    # Drop rows with empty 'Text' column
+    data = data.dropna(subset=['Text'])
+    validation = validation.dropna(subset=['Text'])
+
+    # Tokenizer, StopWordsRemover, CountVectorizer
+    tokenizer = Tokenizer(inputCol="Text", outputCol="tokens")
+    stopwords_remover = StopWordsRemover(inputCol="tokens", outputCol="filtered_tokens", stopWords=stop_words)
+    count_vectorizer = CountVectorizer(inputCol="filtered_tokens", outputCol="features", vocabSize=10000, minDF=5)
+
+    # Naive Bayes Classifier
+    nb = NaiveBayes(labelCol="Label2", featuresCol="features")
+
+    # Pipeline
+    pipeline = Pipeline(stages=[tokenizer, stopwords_remover, count_vectorizer, nb])
+
+    # Fit the pipeline
+    model = pipeline.fit(data)
+
+    # Accuracy Evaluation
+    evaluator = MulticlassClassificationEvaluator(labelCol="Label2", predictionCol="prediction", metricName="accuracy")
+    processed_data = model.transform(data)
+    accuracy = evaluator.evaluate(processed_data)
+    print(f"Model Accuracy: {accuracy:.2f}")
+
+    # Classify new text
+    new_text_df = spark.createDataFrame([('company1', text)], ["Company", "Text"])
+
+    cleaned_new_text = clean_new_text(new_text_df, inputCol="Text", outputCol="Text")
+    predictions = model.transform(cleaned_new_text)
+    result = predictions.select("Text", "prediction").collect()
+    i = result[0]['prediction']
+    return label_mappings[int(i)]
