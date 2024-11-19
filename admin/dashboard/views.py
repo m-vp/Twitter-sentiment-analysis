@@ -175,15 +175,24 @@ def dashboard(request):
 
     # 4. Named Entity Recognition (NER) visualization
     nlp = spacy.load("en_core_web_sm")
+
+# Extract entities from text
     entities = []
     for tweet in df['Tweet-Comment'].fillna(''):
         doc = nlp(tweet)
         entities.extend([(ent.text, ent.label_) for ent in doc.ents])
 
+    # Count the entities
     entity_counter = Counter([label for _, label in entities])
-    fig, ax = plt.subplots()
+
+    # Plot the entities
+    fig, ax = plt.subplots(figsize=(12, 6))  # Increase figure size
     sns.barplot(x=list(entity_counter.keys()), y=list(entity_counter.values()), ax=ax)
     ax.set_title("Named Entity Recognition (NER)")
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')  # Rotate and align labels
+    plt.tight_layout()  # Adjust layout to prevent clipping
+
+    # Save or display the image
     ner_img = generate_image(fig)
 
     # Add all images to context
